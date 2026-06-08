@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Spectral Chromatin Coiler v2",
+  "version": "2.0",
+  "description": "Client‑side prompt compressor: TF‑IDF spectral ranking + RAKE‑driven coiling. Target any token budget.",
+  "permissions": ["activeTab", "scripting"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Coil & Inject"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.claude.ai/*",
+        "https://*.chatgpt.com/*"
+      ],
+      "js": ["content.js"]
+    }
+  ]
+}
