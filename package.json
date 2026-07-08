@@ -1,0 +1,10 @@
+{
+  "name": "spectral-chromatin-coiler",
+  "version": "2.1.0",
+  "private": true,
+  "description": "Privacy-first client-side prompt compressor Chrome extension.",
+  "scripts": {
+    "test": "node tests/compressor.test.js"
+  },
+  "devDependencies": {}
+}
