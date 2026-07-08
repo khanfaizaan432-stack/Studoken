@@ -1,64 +1,98 @@
-(function() {
+(() => {
   'use strict';
 
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    if (request.action === 'inject' && request.text) {
-      injectText(request.text).then(() => sendResponse({ status: 'ok' }));
-      return true;
-    }
-  });
+  const INPUT_SELECTORS = [
+    'textarea#prompt-textarea',
+    'textarea[data-testid="prompt-textarea"]',
+    'textarea[placeholder]',
+    '[contenteditable="true"][data-placeholder]',
+    '[contenteditable="true"][aria-label]',
+    '[contenteditable="true"]'
+  ];
 
-  async function injectText(compressedText) {
-    let inputEl = null;
-    inputEl = document.querySelector('textarea#prompt-textarea');
-    if (!inputEl) {
-      const editables = document.querySelectorAll('[contenteditable="true"]');
-      for (const div of editables) {
-        if (div.offsetParent !== null && (div.getAttribute('data-placeholder') || div.getAttribute('aria-label'))) {
-          inputEl = div;
-          break;
-        }
-      }
-      if (!inputEl && editables.length > 0) inputEl = editables[0];
-    }
-
-    if (!inputEl) {
-      console.error('No input element found.');
-      return;
-    }
-
-    if (inputEl.tagName === 'TEXTAREA' || inputEl.tagName === 'INPUT') {
-      inputEl.value = compressedText;
-      inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-    } else {
-      inputEl.textContent = compressedText;
-      inputEl.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true }));
-      inputEl.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 200));
-
-    const sendBtn = findSendButton();
-    if (sendBtn) sendBtn.click();
+  function isVisible(element) {
+    if (!element) return false;
+    const rect = element.getBoundingClientRect();
+    const style = window.getComputedStyle(element);
+    return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
   }
 
-  function findSendButton() {
-    let btn = document.querySelector('[data-testid="send-button"]');
-    if (btn) return btn;
-    btn = document.querySelector('button[aria-label*="Send" i]');
-    if (btn) return btn;
-    const forms = document.querySelectorAll('form');
-    for (const form of forms) {
-      btn = form.querySelector('button[type="submit"]');
-      if (btn) return btn;
-    }
-    const allBtns = document.querySelectorAll('button');
-    for (const b of allBtns) {
-      const label = (b.getAttribute('aria-label') || '').toLowerCase();
-      const text = (b.textContent || '').toLowerCase();
-      if (label.includes('send') || text.includes('send')) return b;
+  function findInput() {
+    for (const selector of INPUT_SELECTORS) {
+      const candidates = Array.from(document.querySelectorAll(selector));
+      const visible = candidates.find(isVisible);
+      if (visible) return visible;
     }
     return null;
   }
+
+  function setNativeValue(element, value) {
+    const prototype = element.tagName === 'TEXTAREA'
+      ? window.HTMLTextAreaElement.prototype
+      : window.HTMLInputElement.prototype;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+    if (descriptor && descriptor.set) descriptor.set.call(element, value);
+    else element.value = value;
+  }
+
+  function injectText(text) {
+    const input = findInput();
+    if (!input) throw new Error('No prompt input found on this page.');
+
+    input.focus();
+
+    if (input.matches('textarea,input')) {
+      setNativeValue(input, text);
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: text }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    } else {
+      input.textContent = '';
+      input.appendChild(document.createTextNode(text));
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: text }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    return input;
+  }
+
+  function findSendButton() {
+    const selectors = [
+      '[data-testid="send-button"]',
+      'button[aria-label*="Send" i]',
+      'button[type="submit"]'
+    ];
+
+    for (const selector of selectors) {
+      const button = Array.from(document.querySelectorAll(selector)).find(btn => isVisible(btn) && !btn.disabled);
+      if (button) return button;
+    }
+
+    return Array.from(document.querySelectorAll('button')).find(button => {
+      if (!isVisible(button) || button.disabled) return false;
+      const label = `${button.getAttribute('aria-label') || ''} ${button.textContent || ''}`.toLowerCase();
+      return /\bsend\b|submit/.test(label);
+    }) || null;
+  }
+
+  chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+    if (!request || request.action !== 'SCC_INJECT_TEXT') return false;
+
+    try {
+      injectText(String(request.text || ''));
+
+      if (request.autoSubmit) {
+        window.setTimeout(() => {
+          const button = findSendButton();
+          if (button) button.click();
+        }, 120);
+      }
+
+      sendResponse({ status: 'ok' });
+    } catch (error) {
+      console.error('[SCC] inject failed:', error);
+      sendResponse({ status: 'error', message: error.message || String(error) });
+    }
+
+    return true;
+  });
 })();
