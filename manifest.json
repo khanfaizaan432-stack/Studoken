@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
-  "name": "Spectral Chromatin Coiler v2",
-  "version": "2.0",
-  "description": "Client‑side prompt compressor: TF‑IDF spectral ranking + RAKE‑driven coiling. Target any token budget.",
-  "permissions": ["activeTab", "scripting"],
+  "name": "Spectral Chromatin Coiler",
+  "version": "2.1.0",
+  "description": "Privacy-first client-side prompt compressor with spectral ranking, MMR deduping, safe draft injection, and copy fallback.",
+  "permissions": ["activeTab"],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Coil & Inject"
+    "default_title": "Compress prompt"
   },
   "content_scripts": [
     {
