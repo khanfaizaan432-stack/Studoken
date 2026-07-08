@@ -1,54 +1,73 @@
-# 🧬 Spectral Chromatin Coiler (SCC)
+# 🧬 Spectral Chromatin Coiler
 
-A privacy-first, zero-dependency Chrome Extension that compresses Large Language Model (LLM) prompts by up to 60% entirely client-side. 
+A privacy-first Chrome Extension that compresses long LLM prompts locally in the browser. It uses TF-IDF sentence vectors, spectral ranking, MMR deduplication, and lightweight phrase coiling to reduce prompt size while preserving the most central context.
 
-By running native graph-matrix algorithms locally in the browser, SCC eliminates the need for expensive GPU-backed compression servers, saving API tokens and bypassing rate limits without sacrificing core academic context.
+## Why this exists
 
-## ⚠️ The Problem
-Standard text compression algorithms (like Gzip) output binary that LLM tokenizers cannot read. Meanwhile, state-of-the-art AI compression tools (like LLMLingua) require expensive cloud GPUs to calculate token perplexity and often fragment words, degrading the LLM's reasoning ability. 
+Most prompt compressors either require a server/GPU call or produce unreadable binary-style compression. SCC keeps everything client-side and outputs natural language that ChatGPT, Claude, and other LLMs can still read.
 
-## 🚀 The Solution: A Hybrid Architecture
-SCC solves this by moving the heavy computation to the client's CPU and operating at the sentence and syntax level, rather than the token level. It utilizes a two-phase architecture inspired by DNA packaging:
+## What changed in v2.1
 
-### Phase 1: Spectral Selection (The Math)
-1. **Adjacency Matrix:** Parses unstructured text and builds a 2D stochastic matrix representing cosine similarities between sentences (Bag-of-Words).
-2. **Power Iteration Method:** Runs a dependency-free matrix convergence loop to calculate the principal eigenvector, assigning a mathematical centrality score to every sentence.
+- Split the compression engine into `src/compressor.js` so it can be tested outside the popup.
+- Removed duplicated injection logic from `popup.js`; `content.js` now owns page injection.
+- Changed default behavior from auto-submit to safer **Inject Draft**.
+- Added explicit **Copy** fallback and separate **Auto-submit** button.
+- Added approximate-token counting that handles words, punctuation, numbers, and CJK characters better than raw whitespace counting.
+- Added code-block/list preservation options.
+- Added Node smoke tests for compression behavior.
+- Reduced MV3 permissions by removing unnecessary `scripting`.
 
-### Phase 2: Biological Coiling (The Linguistic Filter)
-Instead of blindly deleting low-scoring text, the algorithm categorizes sentences:
-* **Exons (Top Tier):** High-scoring sentences are preserved perfectly intact to anchor the LLM's contextual understanding.
-* **Introns (Lower Tier):** Low-scoring sentences are "coiled." A custom regex filter strips structural stop words (is, the, of, are) while retaining the core nouns, verbs, and technical keywords. 
+## Features
 
-**The Result:** A highly dense, chronological natural language stream that drastically reduces token counts without triggering Byte-Pair Encoding (BPE) fragmentation.
+- **Local-only:** no API keys, no telemetry, no server.
+- **Spectral sentence ranking:** finds central sentences using graph convergence.
+- **MMR deduplication:** avoids keeping multiple sentences that say the same thing.
+- **Biological coiling:** low-ranked sentences are compressed into keyword phrases instead of simply deleted.
+- **Safe workflow:** preview → copy/inject draft → send manually, unless you explicitly choose auto-submit.
+- **Manifest V3:** modern Chrome extension format.
 
-## 🛠️ Features
-* **Zero Infrastructure Cost:** 100% of the $O(N^2)$ matrix math runs on the local browser via native JavaScript.
-* **Privacy Native:** Your lecture notes, unpublished research, and transcripts never leave your device.
-* **Frictionless DOM Injection:** Automatically locates React/Next.js input fields on `claude.ai` and `chatgpt.com`, injects the compressed payload, and triggers native submit events.
-* **Manifest V3 Compliant:** Built to modern Chrome security and service worker standards.
+## Installation
 
-## 📦 Installation (Developer Mode)
-Since this is an active developer build, you can install it directly from the source code:
+1. Clone or download this repository.
+2. Open Chrome and go to `chrome://extensions/`.
+3. Enable **Developer mode**.
+4. Click **Load unpacked**.
+5. Select the repository folder containing `manifest.json`.
+6. Pin the extension.
 
-1. Clone or download this repository to your local machine.
-2. Open Google Chrome and navigate to `chrome://extensions/`.
-3. Toggle **Developer mode** on in the top right corner.
-4. Click **Load unpacked** in the top left corner.
-5. Select the folder containing the repository files (`manifest.json`, `popup.html`, `popup.js`, `content.js`).
-6. Pin the extension to your toolbar for easy access!
+## Usage
 
-## 💻 Usage
-1. Open a tab to [Claude](https://claude.ai) or [ChatGPT](https://chatgpt.com).
-2. Click the 🧬 SCC extension icon in your toolbar.
-3. Paste your massive block of text (lecture transcript, essay, code documentation) into the input box.
-4. Adjust the **Exon retention** slider (0.5 means the top 50% of sentences remain perfectly intact, while the rest are coiled).
-5. Click **Compress & Inject**. 
-6. The extension will calculate the token savings and instantly drop the optimized prompt into your chat window.
+1. Open ChatGPT or Claude in the active tab.
+2. Open the extension popup.
+3. Paste a long prompt, notes, transcript, or document excerpt.
+4. Choose either:
+   - **Context kept** ratio, or
+   - **Max approx tokens** budget.
+5. Click **Compress**.
+6. Review the preview.
+7. Use **Copy**, **Inject Draft**, or **Auto-submit**.
 
-## 🏗️ Tech Stack
-* **Frontend UI:** HTML5, CSS3
-* **Logic Engine:** Vanilla JavaScript (Zero external math/NLP dependencies)
-* **Architecture:** Chrome Extension API (Manifest V3, Content Scripts, ActiveTab Messaging)
+## Development
 
----
-*Built to optimize study workflows and demonstrate practical systems engineering constraints.*
+Run smoke tests with Node:
+
+```bash
+node tests/compressor.test.js
+```
+
+The extension has no npm dependency requirement.
+
+## Architecture
+
+```text
+manifest.json
+popup.html          # Extension UI
+popup.js            # Popup controls and metrics
+content.js          # ChatGPT/Claude text injection
+src/compressor.js   # Compression engine, browser + Node compatible
+tests/              # Dependency-free smoke tests
+```
+
+## Limits
+
+The token count is an approximation, not a provider tokenizer. It is useful for relative savings and budget targeting, but it is not guaranteed to match OpenAI/Anthropic tokenizers exactly.
