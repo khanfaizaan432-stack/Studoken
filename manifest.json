@@ -2,7 +2,9 @@
   "manifest_version": 3,
   "name": "Spectral Chromatin Coiler",
   "version": "2.1.0",
-  "description": "Privacy-first client-side prompt compressor with spectral ranking, MMR deduping, safe draft injection, and copy fallback.",
+  "description": "Privacy-first client-side prompt compressor with semantic ranking, preservation controls, draft injection, and copy fallback.",
+  "homepage_url": "https://github.com/khanfaizaan432-stack/Studoken",
+  "minimum_chrome_version": "114",
   "permissions": ["activeTab"],
   "action": {
     "default_popup": "popup.html",
