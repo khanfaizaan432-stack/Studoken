@@ -14,7 +14,9 @@ Most prompt compressors either require a server/GPU call or produce unreadable b
 - Added explicit **Copy** fallback and separate **Auto-submit** button.
 - Added approximate-token counting that handles words, punctuation, numbers, and CJK characters better than raw whitespace counting.
 - Added code-block/list preservation options.
-- Added Node smoke tests for compression behavior.
+- Added local settings persistence, auto-compress while typing, and Ctrl/⌘ + Enter compression.
+- Added dependency-free extension validation and zip packaging.
+- Added GitHub Actions CI that runs tests and uploads an extension zip artifact.
 - Reduced MV3 permissions by removing unnecessary `scripting`.
 
 ## Features
@@ -24,7 +26,8 @@ Most prompt compressors either require a server/GPU call or produce unreadable b
 - **MMR deduplication:** avoids keeping multiple sentences that say the same thing.
 - **Biological coiling:** low-ranked sentences are compressed into keyword phrases instead of simply deleted.
 - **Safe workflow:** preview → copy/inject draft → send manually, unless you explicitly choose auto-submit.
-- **Manifest V3:** modern Chrome extension format.
+- **Fast UX:** optional auto-compress, saved slider/settings, keyboard shortcut, clear button, and second-pass compression.
+- **Manifest V3:** modern Chrome extension format with minimal permissions.
 
 ## Installation
 
@@ -43,29 +46,37 @@ Most prompt compressors either require a server/GPU call or produce unreadable b
 4. Choose either:
    - **Context kept** ratio, or
    - **Max approx tokens** budget.
-5. Click **Compress**.
+5. Click **Compress** or press Ctrl/⌘ + Enter.
 6. Review the preview.
 7. Use **Copy**, **Inject Draft**, or **Auto-submit**.
 
 ## Development
 
-Run smoke tests with Node:
+Run all checks:
 
 ```bash
-node tests/compressor.test.js
+npm test
 ```
 
-The extension has no npm dependency requirement.
+Build an unpacked-extension zip:
+
+```bash
+npm run build
+```
+
+The extension has no npm dependency requirement. The build script writes `dist/spectral-chromatin-coiler.zip`.
 
 ## Architecture
 
 ```text
+.github/workflows/ci.yml   # CI test + package artifact
 manifest.json
-popup.html          # Extension UI
-popup.js            # Popup controls and metrics
-content.js          # ChatGPT/Claude text injection
-src/compressor.js   # Compression engine, browser + Node compatible
-tests/              # Dependency-free smoke tests
+popup.html                 # Extension UI
+popup.js                   # Popup controls, saved settings, metrics
+content.js                 # ChatGPT/Claude text injection
+src/compressor.js          # Compression engine, browser + Node compatible
+scripts/                   # Validation and zip packaging
+tests/                     # Dependency-free smoke tests
 ```
 
 ## Limits
