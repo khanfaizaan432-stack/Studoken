@@ -1,45 +1,26 @@
-# 🧬 Spectral Chromatin Coiler
+# Spectral Chromatin Coiler
 
-A privacy-first Chrome Extension that compresses long LLM prompts locally in the browser. It uses TF-IDF sentence vectors, spectral ranking, MMR deduplication, and lightweight phrase coiling to reduce prompt size while preserving the most central context.
+[![CI](https://github.com/khanfaizaan432-stack/Studoken/actions/workflows/ci.yml/badge.svg)](https://github.com/khanfaizaan432-stack/Studoken/actions/workflows/ci.yml)
 
-## Why this exists
+Spectral Chromatin Coiler is a privacy-first Chrome extension for compressing long LLM prompts locally in the browser. It combines semantic sentence ranking, redundancy reduction, phrase coiling, and preservation controls so long notes, transcripts, and prompts become shorter while keeping the important constraints intact.
 
-Most prompt compressors either require a server/GPU call or produce unreadable binary-style compression. SCC keeps everything client-side and outputs natural language that ChatGPT, Claude, and other LLMs can still read.
+## Highlights
 
-## What changed in v2.1
-
-- Split the compression engine into `src/compressor.js` so it can be tested outside the popup.
-- Removed duplicated injection logic from `popup.js`; `content.js` now owns page injection.
-- Changed default behavior from auto-submit to safer **Inject Draft**.
-- Added explicit **Copy** fallback and separate **Auto-submit** button.
-- Added approximate-token counting that handles words, punctuation, numbers, CJK characters, and URLs better than raw whitespace counting.
-- Added compression profiles: **Balanced**, **Aggressive**, **Faithful**, and **Study notes**.
-- Added instruction-aware preservation for constraints such as must/never/always/format/return.
-- Added entity-aware scoring for names, acronyms, numbers, dates, percentages, currency values, and URLs.
-- Added code-block, URL, list, heading, instruction, and entity preservation controls.
-- Added a final budget pass for target-token compression.
-- Added local settings persistence, auto-compress while typing, and Ctrl/⌘ + Enter compression.
-- Added dependency-free extension validation and zip packaging.
-- Added GitHub Actions CI that runs tests and uploads an extension zip artifact.
-- Reduced MV3 permissions by removing unnecessary `scripting`.
-
-## Features
-
-- **Local-only:** no API keys, no telemetry, no server.
-- **Spectral sentence ranking:** finds central sentences using graph convergence.
-- **MMR deduplication:** avoids keeping multiple sentences that say the same thing.
-- **Constraint preservation:** keeps important instructions, output-format requirements, dates, numbers, names, URLs, and code blocks safer during compression.
-- **Biological coiling:** low-ranked sentences are compressed into keyword phrases instead of simply deleted.
-- **Safe workflow:** preview → copy/inject draft → send manually, unless you explicitly choose auto-submit.
-- **Fast UX:** optional auto-compress, saved slider/settings, keyboard shortcut, clear button, and second-pass compression.
-- **Manifest V3:** modern Chrome extension format with minimal permissions.
+- **Local-first:** no API keys, telemetry, server calls, or remote inference.
+- **Semantic compression:** TF-IDF sentence vectors, spectral ranking, and MMR deduplication.
+- **Preservation-aware:** protects instructions, output formats, code, URLs, names, dates, numbers, and list structure.
+- **Preview-first workflow:** review compressed text before copying, injecting a draft, or explicitly auto-submitting.
+- **Dependency-free:** tests, validation, and packaging run with Node.js only.
+- **Manifest V3:** minimal extension permissions with `activeTab` only.
 
 ## Compression profiles
 
-- **Balanced:** default mode for general prompts.
-- **Aggressive:** higher savings, stronger coiling, final budget pass enabled.
-- **Faithful:** keeps more context and avoids the strict final budget pass.
-- **Study notes:** tuned for lecture notes and long explanatory text.
+| Profile | Use case | Behavior |
+| --- | --- | --- |
+| Balanced | General prompts | Good default tradeoff between compression and fidelity |
+| Aggressive | Hard token budgets | Stronger coiling and final budget trimming |
+| Faithful | Important context | Keeps more context and avoids strict final trimming |
+| Study notes | Lectures and notes | Tuned for explanatory text and revision material |
 
 ## Installation
 
@@ -54,12 +35,12 @@ Most prompt compressors either require a server/GPU call or produce unreadable b
 
 1. Open ChatGPT or Claude in the active tab.
 2. Open the extension popup.
-3. Paste a long prompt, notes, transcript, or document excerpt.
+3. Paste a long prompt, transcript, notes, or document excerpt.
 4. Choose a compression profile and optionally set a **Max approx tokens** budget.
-5. Use the preservation toggles if you need to protect code, URLs, instructions, entities, lists, or headings.
-6. Click **Compress** or press Ctrl/⌘ + Enter.
+5. Use preservation toggles for code/URLs, lists/headings, instructions, and names/numbers.
+6. Click **Compress** or press Ctrl/Command + Enter.
 7. Review the preview.
-8. Use **Copy**, **Inject Draft**, or **Auto-submit**.
+8. Choose **Copy**, **Inject Draft**, or **Auto-submit**.
 
 ## Development
 
@@ -69,27 +50,45 @@ Run all checks:
 npm test
 ```
 
-Build an unpacked-extension zip:
+Build a Chrome-extension zip:
 
 ```bash
 npm run build
 ```
 
-The extension has no npm dependency requirement. The build script writes `dist/spectral-chromatin-coiler.zip`.
+The build output is written to `dist/spectral-chromatin-coiler.zip`.
 
-## Architecture
+## Repository structure
 
 ```text
-.github/workflows/ci.yml   # CI test + package artifact
-manifest.json
-popup.html                 # Extension UI
-popup.js                   # Popup controls, saved settings, metrics
-content.js                 # ChatGPT/Claude text injection
-src/compressor.js          # Compression engine, browser + Node compatible
-scripts/                   # Validation and zip packaging
-tests/                     # Dependency-free smoke tests
+.github/                 # CI workflow and issue/PR templates
+docs/                    # Architecture and QA documentation
+scripts/                 # Dependency-free validation and zip packaging
+src/compressor.js        # Browser + Node compatible compression engine
+tests/                   # Compressor smoke tests
+content.js               # ChatGPT/Claude draft injection
+manifest.json            # Manifest V3 extension config
+popup.html               # Popup UI
+popup.js                 # Popup controller, metrics, settings, injection calls
 ```
 
-## Limits
+## Documentation
 
-The token count is an approximation, not a provider tokenizer. It is useful for relative savings and budget targeting, but it is not guaranteed to match OpenAI/Anthropic tokenizers exactly. Heavy compression can still remove nuance, so review the preview before sending critical prompts.
+- [Architecture](docs/ARCHITECTURE.md)
+- [Manual QA checklist](docs/QA_CHECKLIST.md)
+- [Privacy policy](PRIVACY.md)
+- [Security policy](SECURITY.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+
+## Privacy and safety
+
+Compression runs locally in your browser. The extension does not send prompt text to a server, analytics provider, model API, or remote database. UI settings may be saved locally so the popup can restore your preferred profile and toggles.
+
+The default workflow is **Inject Draft**, not silent sending. **Auto-submit** is exposed as a separate explicit button.
+
+## Limitations
+
+The token count is an approximation, not a provider-specific tokenizer. It is useful for relative savings and budget targeting, but it is not guaranteed to exactly match OpenAI, Anthropic, or other tokenizer counts.
+
+Heavy compression can remove nuance. Review the preview before sending critical prompts.
