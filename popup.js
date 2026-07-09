@@ -1,7 +1,10 @@
 (() => {
   'use strict';
 
+  const STORAGE_KEY = 'scc.popup.settings.v1';
+  const DEBOUNCE_MS = 350;
   const $ = (id) => document.getElementById(id);
+  let debounceTimer = null;
 
   function setStatus(message, kind = '') {
     const status = $('statusDisplay');
@@ -13,12 +16,67 @@
     const targetRaw = $('targetTokens').value.trim();
     const targetTokens = targetRaw ? Number.parseInt(targetRaw, 10) : null;
     return {
+      profile: $('compressionProfile').value,
       keepRatio: Number.parseFloat($('compressionSlider').value),
       targetTokens: Number.isFinite(targetTokens) && targetTokens > 0 ? targetTokens : null,
       coilingStrength: Number.parseFloat($('coilingStrength').value),
       preserveCodeBlocks: $('preserveCode').checked,
-      preserveListItems: $('preserveLists').checked
+      preserveListItems: $('preserveLists').checked,
+      preserveInstructionSentences: $('preserveInstructions').checked,
+      preserveEntities: $('preserveEntities').checked
     };
+  }
+
+  function getSettings() {
+    return {
+      compressionProfile: $('compressionProfile').value,
+      compressionSlider: $('compressionSlider').value,
+      targetTokens: $('targetTokens').value,
+      coilingStrength: $('coilingStrength').value,
+      preserveCode: $('preserveCode').checked,
+      preserveLists: $('preserveLists').checked,
+      preserveInstructions: $('preserveInstructions').checked,
+      preserveEntities: $('preserveEntities').checked,
+      autoCompress: $('autoCompress').checked
+    };
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(getSettings()));
+    } catch (_error) {
+      // Ignore storage failures; extension still works without persistence.
+    }
+  }
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const settings = JSON.parse(raw);
+      if (settings.compressionProfile) $('compressionProfile').value = settings.compressionProfile;
+      if (settings.compressionSlider) $('compressionSlider').value = settings.compressionSlider;
+      if (settings.targetTokens) $('targetTokens').value = settings.targetTokens;
+      if (settings.coilingStrength) $('coilingStrength').value = settings.coilingStrength;
+      if (typeof settings.preserveCode === 'boolean') $('preserveCode').checked = settings.preserveCode;
+      if (typeof settings.preserveLists === 'boolean') $('preserveLists').checked = settings.preserveLists;
+      if (typeof settings.preserveInstructions === 'boolean') $('preserveInstructions').checked = settings.preserveInstructions;
+      if (typeof settings.preserveEntities === 'boolean') $('preserveEntities').checked = settings.preserveEntities;
+      if (typeof settings.autoCompress === 'boolean') $('autoCompress').checked = settings.autoCompress;
+    } catch (_error) {
+      localStorage.removeItem(STORAGE_KEY);
+    }
+  }
+
+  function applyProfileDefaults() {
+    const profile = $('compressionProfile').value;
+    const presets = SpectralChromatinCoiler.PROFILE_PRESETS || {};
+    const preset = presets[profile];
+    if (!preset) return;
+    $('compressionSlider').value = String(preset.keepRatio ?? $('compressionSlider').value);
+    $('coilingStrength').value = String(preset.coilingStrength ?? $('coilingStrength').value);
+    if (typeof preset.preserveInstructionSentences === 'boolean') $('preserveInstructions').checked = preset.preserveInstructionSentences;
+    if (typeof preset.preserveEntities === 'boolean') $('preserveEntities').checked = preset.preserveEntities;
   }
 
   function renderMetrics(result) {
@@ -30,6 +88,48 @@
     $('copyBtn').disabled = !result.compressedText;
     $('injectBtn').disabled = !result.compressedText;
     $('autoSubmitBtn').disabled = !result.compressedText;
+    $('swapBtn').disabled = !result.compressedText;
+  }
+
+  function syncLabels() {
+    $('sliderValueLabel').textContent = `${Math.round(Number.parseFloat($('compressionSlider').value) * 100)}%`;
+    $('strengthValueLabel').textContent = `${Math.round(Number.parseFloat($('coilingStrength').value) * 100)}%`;
+  }
+
+  function compressNow({ quiet = false } = {}) {
+    const text = $('rawText').value.trim();
+    saveSettings();
+    syncLabels();
+
+    if (!text) {
+      renderMetrics({ compressedText: '', originalTokens: 0, newTokens: 0, percentSaved: 0, sentenceCount: 0 });
+      if (!quiet) setStatus('⚠️ Paste text first.', 'error');
+      return null;
+    }
+
+    try {
+      if (!quiet) setStatus('⏳ Compressing…');
+      const result = SpectralChromatinCoiler.compress(text, getOptions());
+      renderMetrics(result);
+
+      const budgetNote = result.mode === 'target'
+        ? (result.hitTarget ? ` under target ${result.targetTokens}` : ` best effort; still above target ${result.targetTokens}`)
+        : '';
+      setStatus(`✅ ${result.profile || 'balanced'} saved ${result.percentSaved.toFixed(1)}% approx tokens (${result.originalTokens} → ${result.newTokens}${budgetNote}).`, 'success');
+      return result;
+    } catch (error) {
+      console.error(error);
+      if (!quiet) setStatus(`❌ Compression failed: ${error.message || error}`, 'error');
+      return null;
+    }
+  }
+
+  function scheduleAutoCompress() {
+    saveSettings();
+    syncLabels();
+    if (!$('autoCompress').checked) return;
+    window.clearTimeout(debounceTimer);
+    debounceTimer = window.setTimeout(() => compressNow({ quiet: true }), DEBOUNCE_MS);
   }
 
   async function getActiveSupportedTab() {
@@ -60,40 +160,27 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
-    const rawText = $('rawText');
-    const slider = $('compressionSlider');
-    const strength = $('coilingStrength');
-
-    function syncLabels() {
-      $('sliderValueLabel').textContent = `${Math.round(Number.parseFloat(slider.value) * 100)}%`;
-      $('strengthValueLabel').textContent = `${Math.round(Number.parseFloat(strength.value) * 100)}%`;
-    }
-
-    slider.addEventListener('input', syncLabels);
-    strength.addEventListener('input', syncLabels);
+    loadSettings();
     syncLabels();
 
-    $('processBtn').addEventListener('click', () => {
-      const text = rawText.value.trim();
-      if (!text) {
-        setStatus('⚠️ Paste text first.', 'error');
-        return;
-      }
+    $('compressionProfile').addEventListener('change', () => {
+      applyProfileDefaults();
+      scheduleAutoCompress();
+    });
 
-      try {
-        setStatus('⏳ Compressing…');
-        const result = SpectralChromatinCoiler.compress(text, getOptions());
-        renderMetrics(result);
+    ['compressionSlider', 'coilingStrength', 'targetTokens', 'preserveCode', 'preserveLists', 'preserveInstructions', 'preserveEntities', 'autoCompress']
+      .forEach(id => $(id).addEventListener('input', scheduleAutoCompress));
 
-        const budgetNote = result.mode === 'target'
-          ? (result.hitTarget ? ` under target ${result.targetTokens}` : ` best effort; still above target ${result.targetTokens}`)
-          : '';
-        setStatus(`✅ Saved ${result.percentSaved.toFixed(1)}% approx tokens (${result.originalTokens} → ${result.newTokens}${budgetNote}).`, 'success');
-      } catch (error) {
-        console.error(error);
-        setStatus(`❌ Compression failed: ${error.message || error}`, 'error');
+    $('rawText').addEventListener('input', scheduleAutoCompress);
+
+    document.addEventListener('keydown', (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        compressNow();
       }
     });
+
+    $('processBtn').addEventListener('click', () => compressNow());
 
     $('copyBtn').addEventListener('click', async () => {
       try {
@@ -122,6 +209,20 @@
         console.error(error);
         setStatus(`❌ Auto-submit failed: ${error.message || error}`, 'error');
       }
+    });
+
+    $('swapBtn').addEventListener('click', () => {
+      const preview = $('previewText').value.trim();
+      if (!preview) return;
+      $('rawText').value = preview;
+      compressNow({ quiet: true });
+      setStatus('↩️ Preview moved back into input for another compression pass.', 'success');
+    });
+
+    $('clearBtn').addEventListener('click', () => {
+      $('rawText').value = '';
+      renderMetrics({ compressedText: '', originalTokens: 0, newTokens: 0, percentSaved: 0, sentenceCount: 0 });
+      setStatus('Cleared.');
     });
   });
 })();

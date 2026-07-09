@@ -1,30 +1,26 @@
-# 🧬 Spectral Chromatin Coiler
+# Spectral Chromatin Coiler
 
-A privacy-first Chrome Extension that compresses long LLM prompts locally in the browser. It uses TF-IDF sentence vectors, spectral ranking, MMR deduplication, and lightweight phrase coiling to reduce prompt size while preserving the most central context.
+[![CI](https://github.com/khanfaizaan432-stack/Studoken/actions/workflows/ci.yml/badge.svg)](https://github.com/khanfaizaan432-stack/Studoken/actions/workflows/ci.yml)
 
-## Why this exists
+Spectral Chromatin Coiler is a privacy-first Chrome extension for compressing long LLM prompts locally in the browser. It combines semantic sentence ranking, redundancy reduction, phrase coiling, and preservation controls so long notes, transcripts, and prompts become shorter while keeping the important constraints intact.
 
-Most prompt compressors either require a server/GPU call or produce unreadable binary-style compression. SCC keeps everything client-side and outputs natural language that ChatGPT, Claude, and other LLMs can still read.
+## Highlights
 
-## What changed in v2.1
+- **Local-first:** no API keys, telemetry, server calls, or remote inference.
+- **Semantic compression:** TF-IDF sentence vectors, spectral ranking, and MMR deduplication.
+- **Preservation-aware:** protects instructions, output formats, code, URLs, names, dates, numbers, and list structure.
+- **Preview-first workflow:** review compressed text before copying, injecting a draft, or explicitly auto-submitting.
+- **Dependency-free:** tests, validation, and packaging run with Node.js only.
+- **Manifest V3:** minimal extension permissions with `activeTab` only.
 
-- Split the compression engine into `src/compressor.js` so it can be tested outside the popup.
-- Removed duplicated injection logic from `popup.js`; `content.js` now owns page injection.
-- Changed default behavior from auto-submit to safer **Inject Draft**.
-- Added explicit **Copy** fallback and separate **Auto-submit** button.
-- Added approximate-token counting that handles words, punctuation, numbers, and CJK characters better than raw whitespace counting.
-- Added code-block/list preservation options.
-- Added Node smoke tests for compression behavior.
-- Reduced MV3 permissions by removing unnecessary `scripting`.
+## Compression profiles
 
-## Features
-
-- **Local-only:** no API keys, no telemetry, no server.
-- **Spectral sentence ranking:** finds central sentences using graph convergence.
-- **MMR deduplication:** avoids keeping multiple sentences that say the same thing.
-- **Biological coiling:** low-ranked sentences are compressed into keyword phrases instead of simply deleted.
-- **Safe workflow:** preview → copy/inject draft → send manually, unless you explicitly choose auto-submit.
-- **Manifest V3:** modern Chrome extension format.
+| Profile | Use case | Behavior |
+| --- | --- | --- |
+| Balanced | General prompts | Good default tradeoff between compression and fidelity |
+| Aggressive | Hard token budgets | Stronger coiling and final budget trimming |
+| Faithful | Important context | Keeps more context and avoids strict final trimming |
+| Study notes | Lectures and notes | Tuned for explanatory text and revision material |
 
 ## Installation
 
@@ -39,35 +35,60 @@ Most prompt compressors either require a server/GPU call or produce unreadable b
 
 1. Open ChatGPT or Claude in the active tab.
 2. Open the extension popup.
-3. Paste a long prompt, notes, transcript, or document excerpt.
-4. Choose either:
-   - **Context kept** ratio, or
-   - **Max approx tokens** budget.
-5. Click **Compress**.
-6. Review the preview.
-7. Use **Copy**, **Inject Draft**, or **Auto-submit**.
+3. Paste a long prompt, transcript, notes, or document excerpt.
+4. Choose a compression profile and optionally set a **Max approx tokens** budget.
+5. Use preservation toggles for code/URLs, lists/headings, instructions, and names/numbers.
+6. Click **Compress** or press Ctrl/Command + Enter.
+7. Review the preview.
+8. Choose **Copy**, **Inject Draft**, or **Auto-submit**.
 
 ## Development
 
-Run smoke tests with Node:
+Run all checks:
 
 ```bash
-node tests/compressor.test.js
+npm test
 ```
 
-The extension has no npm dependency requirement.
+Build a Chrome-extension zip:
 
-## Architecture
+```bash
+npm run build
+```
+
+The build output is written to `dist/spectral-chromatin-coiler.zip`.
+
+## Repository structure
 
 ```text
-manifest.json
-popup.html          # Extension UI
-popup.js            # Popup controls and metrics
-content.js          # ChatGPT/Claude text injection
-src/compressor.js   # Compression engine, browser + Node compatible
-tests/              # Dependency-free smoke tests
+.github/                 # CI workflow and issue/PR templates
+docs/                    # Architecture and QA documentation
+scripts/                 # Dependency-free validation and zip packaging
+src/compressor.js        # Browser + Node compatible compression engine
+tests/                   # Compressor smoke tests
+content.js               # ChatGPT/Claude draft injection
+manifest.json            # Manifest V3 extension config
+popup.html               # Popup UI
+popup.js                 # Popup controller, metrics, settings, injection calls
 ```
 
-## Limits
+## Documentation
 
-The token count is an approximation, not a provider tokenizer. It is useful for relative savings and budget targeting, but it is not guaranteed to match OpenAI/Anthropic tokenizers exactly.
+- [Architecture](docs/ARCHITECTURE.md)
+- [Manual QA checklist](docs/QA_CHECKLIST.md)
+- [Privacy policy](PRIVACY.md)
+- [Security policy](SECURITY.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+
+## Privacy and safety
+
+Compression runs locally in your browser. The extension does not send prompt text to a server, analytics provider, model API, or remote database. UI settings may be saved locally so the popup can restore your preferred profile and toggles.
+
+The default workflow is **Inject Draft**, not silent sending. **Auto-submit** is exposed as a separate explicit button.
+
+## Limitations
+
+The token count is an approximation, not a provider-specific tokenizer. It is useful for relative savings and budget targeting, but it is not guaranteed to exactly match OpenAI, Anthropic, or other tokenizer counts.
+
+Heavy compression can remove nuance. Review the preview before sending critical prompts.

@@ -3,8 +3,28 @@
   "version": "2.1.0",
   "private": true,
   "description": "Privacy-first client-side prompt compressor Chrome extension.",
+  "keywords": [
+    "chrome-extension",
+    "prompt-compression",
+    "llm",
+    "local-first",
+    "manifest-v3"
+  ],
+  "homepage": "https://github.com/khanfaizaan432-stack/Studoken#readme",
+  "bugs": {
+    "url": "https://github.com/khanfaizaan432-stack/Studoken/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/khanfaizaan432-stack/Studoken.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "test": "node tests/compressor.test.js"
+    "test": "node tests/compressor.test.js && node scripts/validate-extension.js",
+    "validate": "node scripts/validate-extension.js",
+    "build": "node scripts/build-zip.js"
   },
   "devDependencies": {}
 }

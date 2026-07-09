@@ -6,7 +6,7 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
-      width: 430px;
+      width: 440px;
       font-family: Inter, "Segoe UI", system-ui, sans-serif;
       background: #11111b;
       color: #cdd6f4;
@@ -27,12 +27,12 @@
       resize: vertical;
       outline: none;
     }
-    textarea:focus, input:focus { border-color: #cba6f7; }
+    textarea:focus, input:focus, select:focus { border-color: #cba6f7; }
     .row { display: flex; align-items: center; gap: 10px; margin: 12px 0; }
     .control { flex: 1; }
     label { display: block; font-size: 12px; color: #a6adc8; margin-bottom: 5px; }
     input[type="range"] { width: 100%; accent-color: #cba6f7; }
-    input[type="number"] {
+    input[type="number"], select {
       width: 100%;
       background: #181825;
       border: 1px solid #313244;
@@ -42,7 +42,7 @@
       font-size: 13px;
     }
     .value { color: #cba6f7; font-weight: 700; }
-    .check-row { display: flex; gap: 12px; margin: 8px 0 12px; color: #a6adc8; font-size: 12px; }
+    .check-row { display: flex; flex-wrap: wrap; gap: 10px 12px; margin: 8px 0 12px; color: #a6adc8; font-size: 12px; }
     .check-row label { display: flex; align-items: center; gap: 6px; margin: 0; }
     button {
       width: 100%;
@@ -58,29 +58,37 @@
     }
     button.secondary { background: #313244; color: #cdd6f4; }
     button.warning { background: #f9e2af; color: #11111b; }
+    button.ghost { background: transparent; color: #a6adc8; border: 1px solid #313244; }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
     button:hover:not(:disabled) { filter: brightness(1.08); }
     .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .utility-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 10px 0; }
     .metric { background: #181825; border: 1px solid #313244; border-radius: 8px; padding: 8px; text-align: center; }
     .metric strong { display: block; color: #a6e3a1; font-size: 13px; }
     .metric span { font-size: 10px; color: #a6adc8; }
     #previewText { min-height: 110px; margin-top: 8px; }
     #statusDisplay { margin-top: 10px; font-size: 12px; text-align: center; min-height: 18px; line-height: 1.35; }
+    .hint { color: #585b70; font-size: 11px; margin-top: 6px; text-align: center; }
     .error { color: #f38ba8; }
     .success { color: #a6e3a1; }
   </style>
 </head>
 <body>
   <h1>🧬 Spectral Chromatin Coiler</h1>
-  <p class="subtitle">Compress locally, preview first, then copy or inject into ChatGPT/Claude. Nothing leaves your browser.</p>
+  <p class="subtitle">Compress locally, preserve constraints/entities, preview first, then copy or inject into ChatGPT/Claude.</p>
 
   <textarea id="rawText" placeholder="Paste notes, transcripts, docs, or long prompts..."></textarea>
 
   <div class="row">
     <div class="control">
-      <label>Context kept: <span class="value" id="sliderValueLabel">50%</span></label>
-      <input type="range" id="compressionSlider" min="0.1" max="0.9" step="0.01" value="0.5">
+      <label>Profile</label>
+      <select id="compressionProfile">
+        <option value="balanced">Balanced</option>
+        <option value="aggressive">Aggressive</option>
+        <option value="faithful">Faithful</option>
+        <option value="study">Study notes</option>
+      </select>
     </div>
     <div class="control">
       <label>Max approx tokens</label>
@@ -90,14 +98,21 @@
 
   <div class="row">
     <div class="control">
+      <label>Context kept: <span class="value" id="sliderValueLabel">50%</span></label>
+      <input type="range" id="compressionSlider" min="0.1" max="0.9" step="0.01" value="0.5">
+    </div>
+    <div class="control">
       <label>Coiling strength: <span class="value" id="strengthValueLabel">80%</span></label>
       <input type="range" id="coilingStrength" min="0.4" max="1.2" step="0.05" value="0.8">
     </div>
   </div>
 
   <div class="check-row">
-    <label><input type="checkbox" id="preserveCode" checked> Preserve code blocks</label>
+    <label><input type="checkbox" id="preserveCode" checked> Preserve code/URLs</label>
     <label><input type="checkbox" id="preserveLists" checked> Preserve lists/headings</label>
+    <label><input type="checkbox" id="preserveInstructions" checked> Preserve instructions</label>
+    <label><input type="checkbox" id="preserveEntities" checked> Preserve names/numbers</label>
+    <label><input type="checkbox" id="autoCompress" checked> Auto-compress while typing</label>
   </div>
 
   <button id="processBtn">⚡ Compress</button>
@@ -117,7 +132,13 @@
     <button class="warning" id="autoSubmitBtn" disabled>Auto-submit</button>
   </div>
 
+  <div class="utility-actions">
+    <button class="ghost" id="swapBtn" disabled>Use preview as input</button>
+    <button class="ghost" id="clearBtn">Clear</button>
+  </div>
+
   <div id="statusDisplay"></div>
+  <p class="hint">Shortcut: Ctrl/⌘ + Enter compresses. Settings are saved locally.</p>
 
   <script src="src/compressor.js"></script>
   <script src="popup.js"></script>
