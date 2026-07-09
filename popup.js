@@ -16,21 +16,27 @@
     const targetRaw = $('targetTokens').value.trim();
     const targetTokens = targetRaw ? Number.parseInt(targetRaw, 10) : null;
     return {
+      profile: $('compressionProfile').value,
       keepRatio: Number.parseFloat($('compressionSlider').value),
       targetTokens: Number.isFinite(targetTokens) && targetTokens > 0 ? targetTokens : null,
       coilingStrength: Number.parseFloat($('coilingStrength').value),
       preserveCodeBlocks: $('preserveCode').checked,
-      preserveListItems: $('preserveLists').checked
+      preserveListItems: $('preserveLists').checked,
+      preserveInstructionSentences: $('preserveInstructions').checked,
+      preserveEntities: $('preserveEntities').checked
     };
   }
 
   function getSettings() {
     return {
+      compressionProfile: $('compressionProfile').value,
       compressionSlider: $('compressionSlider').value,
       targetTokens: $('targetTokens').value,
       coilingStrength: $('coilingStrength').value,
       preserveCode: $('preserveCode').checked,
       preserveLists: $('preserveLists').checked,
+      preserveInstructions: $('preserveInstructions').checked,
+      preserveEntities: $('preserveEntities').checked,
       autoCompress: $('autoCompress').checked
     };
   }
@@ -48,15 +54,29 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (!raw) return;
       const settings = JSON.parse(raw);
+      if (settings.compressionProfile) $('compressionProfile').value = settings.compressionProfile;
       if (settings.compressionSlider) $('compressionSlider').value = settings.compressionSlider;
       if (settings.targetTokens) $('targetTokens').value = settings.targetTokens;
       if (settings.coilingStrength) $('coilingStrength').value = settings.coilingStrength;
       if (typeof settings.preserveCode === 'boolean') $('preserveCode').checked = settings.preserveCode;
       if (typeof settings.preserveLists === 'boolean') $('preserveLists').checked = settings.preserveLists;
+      if (typeof settings.preserveInstructions === 'boolean') $('preserveInstructions').checked = settings.preserveInstructions;
+      if (typeof settings.preserveEntities === 'boolean') $('preserveEntities').checked = settings.preserveEntities;
       if (typeof settings.autoCompress === 'boolean') $('autoCompress').checked = settings.autoCompress;
     } catch (_error) {
       localStorage.removeItem(STORAGE_KEY);
     }
+  }
+
+  function applyProfileDefaults() {
+    const profile = $('compressionProfile').value;
+    const presets = SpectralChromatinCoiler.PROFILE_PRESETS || {};
+    const preset = presets[profile];
+    if (!preset) return;
+    $('compressionSlider').value = String(preset.keepRatio ?? $('compressionSlider').value);
+    $('coilingStrength').value = String(preset.coilingStrength ?? $('coilingStrength').value);
+    if (typeof preset.preserveInstructionSentences === 'boolean') $('preserveInstructions').checked = preset.preserveInstructionSentences;
+    if (typeof preset.preserveEntities === 'boolean') $('preserveEntities').checked = preset.preserveEntities;
   }
 
   function renderMetrics(result) {
@@ -95,7 +115,7 @@
       const budgetNote = result.mode === 'target'
         ? (result.hitTarget ? ` under target ${result.targetTokens}` : ` best effort; still above target ${result.targetTokens}`)
         : '';
-      setStatus(`✅ Saved ${result.percentSaved.toFixed(1)}% approx tokens (${result.originalTokens} → ${result.newTokens}${budgetNote}).`, 'success');
+      setStatus(`✅ ${result.profile || 'balanced'} saved ${result.percentSaved.toFixed(1)}% approx tokens (${result.originalTokens} → ${result.newTokens}${budgetNote}).`, 'success');
       return result;
     } catch (error) {
       console.error(error);
@@ -143,7 +163,12 @@
     loadSettings();
     syncLabels();
 
-    ['compressionSlider', 'coilingStrength', 'targetTokens', 'preserveCode', 'preserveLists', 'autoCompress']
+    $('compressionProfile').addEventListener('change', () => {
+      applyProfileDefaults();
+      scheduleAutoCompress();
+    });
+
+    ['compressionSlider', 'coilingStrength', 'targetTokens', 'preserveCode', 'preserveLists', 'preserveInstructions', 'preserveEntities', 'autoCompress']
       .forEach(id => $(id).addEventListener('input', scheduleAutoCompress));
 
     $('rawText').addEventListener('input', scheduleAutoCompress);
