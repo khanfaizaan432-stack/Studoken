@@ -4,7 +4,9 @@
   "private": true,
   "description": "Privacy-first client-side prompt compressor Chrome extension.",
   "scripts": {
-    "test": "node tests/compressor.test.js"
+    "test": "node tests/compressor.test.js && node scripts/validate-extension.js",
+    "validate": "node scripts/validate-extension.js",
+    "build": "node scripts/build-zip.js"
   },
   "devDependencies": {}
 }
